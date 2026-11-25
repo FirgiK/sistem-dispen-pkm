@@ -1,5 +1,5 @@
 export const DISPENSASI_STATUS = {
-  MENUNGGU_KAPUS: 'Menunggu Kapus',
+  MENUNGGU_PERSETUJUAN: 'Menunggu Persetujuan',
   SUDAH_DIBERIKAN: 'Sudah Diberikan di Sadasbor',
   DITOLAK: 'Ditolak',
   DIBATALKAN: 'Dibatalkan',

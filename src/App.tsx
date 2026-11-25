@@ -1,24 +1,56 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { DispensasiFormPage, KapusDashboardPage } from './features/dispensasi';
-import { BencanaFormPage } from './features/bencana';
+
+// Dynamic Import (Code Splitting): hanya unduh halaman saat dibuka pengguna
+const DispensasiFormPage = lazy(() =>
+  import('./features/dispensasi/DispensasiFormPage')
+);
+const DashboardPage = lazy(() =>
+  import('./features/dashboard/DashboardPage')
+);
+const PortalLayananPage = lazy(() =>
+  import('./features/portal/PortalLayananPage')
+);
+const ComingSoonPage = lazy(() =>
+  import('./features/portal/ComingSoonPage')
+);
+
+function PageLoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 text-sm">
+      <div className="flex items-center gap-2">
+        <span className="inline-block animate-spin">⏳</span>
+        <span className="font-medium">Memuat halaman...</span>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Form pengajuan dispensasi — satu link, tanpa login */}
-        <Route path="/dispensasi" element={<DispensasiFormPage />} />
+      <Suspense fallback={<PageLoadingFallback />}>
+        <Routes>
+          {/* Halaman utama default diarahkan ke /dashboard */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        {/* Form pelaporan bencana — offline-first */}
-        <Route path="/bencana" element={<BencanaFormPage />} />
+          {/* Portal 6 Grid Layanan Mandiri Petugas */}
+          <Route path="/layanan" element={<PortalLayananPage />} />
+          <Route path="/portal" element={<Navigate to="/layanan" replace />} />
 
-        {/* Dashboard Terpadu Kapus */}
-        <Route path="/kapus" element={<KapusDashboardPage />} />
-        <Route path="/dashboard" element={<Navigate to="/kapus" replace />} />
+          {/* Template Halaman Coming Soon untuk layanan yang belum dihubungkan */}
+          <Route path="/coming-soon" element={<ComingSoonPage />} />
 
-        {/* Default route redirect ke /dispensasi */}
-        <Route path="/" element={<Navigate to="/dispensasi" replace />} />
-      </Routes>
+          {/* Form pengajuan dispensasi — satu link, tanpa login */}
+          <Route path="/dispensasi" element={<DispensasiFormPage />} />
+
+          {/* Dashboard Terpadu Puskesmas */}
+          <Route path="/dashboard" element={<DashboardPage />} />
+
+          {/* Catch-all: semua rute tidak dikenal otomatis diarahkan ke /dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

@@ -5,6 +5,7 @@ import {
   syncPendingDrafts,
   type MergedDispensasiItem,
 } from '../../lib/dispensasi-sync';
+import { getPendingDispensasiDrafts } from '../../lib/offline-storage';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import type { DispensasiStatus } from '../../types/dispensasi';
 
@@ -14,6 +15,17 @@ export function useDispensasiList() {
   const [error, setError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [pendingDraftsCount, setPendingDraftsCount] = useState(0);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+
+  const checkPendingDrafts = useCallback(async () => {
+    try {
+      const drafts = await getPendingDispensasiDrafts();
+      setPendingDraftsCount(drafts.length);
+    } catch {
+      setPendingDraftsCount(0);
+    }
+  }, []);
 
   const fetchList = useCallback(async () => {
     setIsLoading(true);
@@ -21,6 +33,10 @@ export function useDispensasiList() {
     try {
       const data = await fetchMergedDispensasiList();
       setItems(data);
+      await checkPendingDrafts();
+      if (isSupabaseConfigured && navigator.onLine) {
+        setLastSyncTime(new Date());
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Gagal memuat daftar pengajuan',
@@ -28,7 +44,7 @@ export function useDispensasiList() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [checkPendingDrafts]);
 
   const triggerSync = useCallback(async () => {
     if (!isSupabaseConfigured || !navigator.onLine) return;
@@ -36,6 +52,7 @@ export function useDispensasiList() {
     try {
       await syncPendingDrafts();
       await fetchList();
+      setLastSyncTime(new Date());
     } finally {
       setIsSyncing(false);
     }
@@ -83,6 +100,8 @@ export function useDispensasiList() {
     error,
     isOnline,
     isConfigured: isSupabaseConfigured,
+    pendingDraftsCount,
+    lastSyncTime,
     refresh: fetchList,
     triggerSync,
     giveDecision,

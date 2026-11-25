@@ -8,3 +8,6 @@ export { default as Card } from './Card';
 export { default as PageLayout } from './PageLayout';
 export { default as EmptyState } from './EmptyState';
 export { default as ComingSoonCard } from './ComingSoonCard';
+export { default as PuskesmasLogo } from './PuskesmasLogo';
+export { default as Footer } from './Footer';
+export { default as Dialog } from './Dialog';

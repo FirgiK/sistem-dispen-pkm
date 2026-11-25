@@ -404,6 +404,16 @@ Umum:
   dan bisa dicari: submitDispensasiForm,
   pendingOfflineReports. Hindari singkatan samar
   (data2, tmp, handleStuff, x).
+- Standar Penamaan Universal (Clean Code):
+  Gunakan istilah standar industri internasional dan W3C/HTML5
+  resmi untuk penamaan komponen dan file (contoh: gunakan
+  `Dialog` bukan `Modal` kustom, `Select`, `Button`, `Input`).
+  Jangan menciptakan istilah ciptaan sendiri yang menyulitkan
+  perawatan kode oleh pengembang lain.
+- Konfirmasi Sebelum Eksekusi Aksi Kritis:
+  Setiap tindakan destruktif, pembatalan pengajuan, atau reset
+  formulir WAJIB menyertakan dialog konfirmasi (jangan klik
+  langsung eksekusi tanpa kepastian dari pengguna).
 - Jangan mengulang (DRY) untuk logika, tapi jangan
   membuat abstraksi sebelum pola yang sama muncul
   minimal dua kali dan benar-benar sama.
@@ -456,6 +466,15 @@ Styling dan UI:
   selalu ada teks statusnya (aksesibilitas).
 - Jangan memakai data contoh yang terlihat seperti
   data petugas / pasien asli di screenshot / demo.
+- Identitas & Logo Puskesmas:
+  Selalu gunakan komponen PuskesmasLogo (src/components/PuskesmasLogo.tsx)
+  yang membaca file resmi lokal "/logo-puskesmas.png".
+  Jangan menempelkan logo dari URL eksternal (agar offline-ready).
+  Di halaman form publik, gunakan Opsi A (identitas instansi dan logo
+  terintegrasi di pucuk kartu formulir dalam satu garis pandang vertikal,
+  tanpa banner tebal yang terputus).
+  Di halaman dashboard, tampilkan logo berdampingan dengan judul di header.
+  Sertakan komponen Footer resmi (src/components/Footer.tsx) di bagian bawah.
 
 Keamanan dan privasi:
 - Tidak ada secret, key privat, atau kredensial di

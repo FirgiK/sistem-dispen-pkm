@@ -12,7 +12,7 @@ const statusConfig: Record<
   DispensasiStatus,
   { bg: string; text: string; dot: string }
 > = {
-  [DISPENSASI_STATUS.MENUNGGU_KAPUS]: {
+  [DISPENSASI_STATUS.MENUNGGU_PERSETUJUAN]: {
     bg: 'bg-amber-50 border-amber-200',
     text: 'text-amber-700',
     dot: 'bg-amber-500',

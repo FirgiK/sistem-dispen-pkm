@@ -4,9 +4,14 @@ import {
   getPendingDispensasiDrafts,
   updateDispensasiDraftSync,
   getDispensasiDraft,
+  deleteDispensasiDraft,
+  clearSyncedDispensasiDrafts,
+  purgeLocalUserData,
   type DispensasiDraft,
 } from './offline-storage';
-import type { DispensasiStatus } from '../types/dispensasi';
+import { DISPENSASI_STATUS, type DispensasiStatus } from '../types/dispensasi';
+
+export { deleteDispensasiDraft, clearSyncedDispensasiDrafts, purgeLocalUserData };
 
 export interface MergedDispensasiItem {
   id: string; // remoteId atau localId
@@ -20,9 +25,11 @@ export interface MergedDispensasiItem {
   tanggalMulai: string;
   tanggalSelesai: string;
   alasan: string;
+  lampiranUrl?: string;
   status: DispensasiStatus;
   alasanPenolakan?: string;
   createdAt: string;
+  updatedAt?: string;
   source: 'server' | 'local';
   syncStatus?: string;
 }
@@ -134,9 +141,11 @@ export async function fetchMergedDispensasiList(): Promise<MergedDispensasiItem[
             tanggalMulai: row.tanggal_mulai,
             tanggalSelesai: row.tanggal_selesai,
             alasan: row.alasan,
+            lampiranUrl: row.lampiran_url || undefined,
             status: row.status as DispensasiStatus,
             alasanPenolakan: row.alasan_penolakan || undefined,
             createdAt: row.created_at,
+            updatedAt: row.updated_at || row.created_at,
             source: 'server',
             syncStatus: 'synced',
           });
@@ -163,6 +172,7 @@ export async function fetchMergedDispensasiList(): Promise<MergedDispensasiItem[
         tanggalMulai: draft.data.tanggalMulai,
         tanggalSelesai: draft.data.tanggalSelesai,
         alasan: draft.data.alasan,
+        lampiranUrl: draft.data.lampiranUrl || undefined,
         status: draft.data.status,
         alasanPenolakan: draft.data.alasanPenolakan,
         createdAt: draft.createdAt,
@@ -188,7 +198,7 @@ export async function fetchMergedDispensasiList(): Promise<MergedDispensasiItem[
 }
 
 /**
- * Update keputusan Kapus pada pengajuan (baik di Supabase maupun lokal).
+ * Update keputusan pada pengajuan (baik di Supabase maupun lokal).
  */
 export async function updateDispensasiDecision(
   item: MergedDispensasiItem,
@@ -224,4 +234,124 @@ export async function updateDispensasiDecision(
       });
     }
   }
+}
+
+
+/**
+ * Membatalkan pengajuan dispensasi oleh pengaju sendiri (Alur v3: Status 'Dibatalkan').
+ */
+export async function cancelDispensasi(
+  localId?: string,
+  remoteId?: string,
+): Promise<boolean> {
+  const newStatus = DISPENSASI_STATUS.DIBATALKAN;
+
+  // 1. Update ke Supabase jika remoteId ada dan online
+  if (isSupabaseConfigured && supabase && remoteId && navigator.onLine) {
+    try {
+      await supabase
+        .from('dispensasi')
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', remoteId);
+    } catch (err) {
+      console.warn('Gagal membatalkan di Supabase:', err);
+    }
+  }
+
+  // 2. Update di IndexedDB lokal
+  if (localId) {
+    try {
+      const draft = await getDispensasiDraft(localId);
+      if (draft) {
+        draft.data.status = newStatus;
+        await updateDispensasiDraftSync(localId, {
+          syncStatus: draft.syncStatus,
+        });
+      }
+    } catch (err) {
+      console.warn('Gagal membatalkan di lokal:', err);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Mengambil status satu pengajuan aktif (cek status live dari server atau lokal).
+ */
+export async function fetchSubmissionStatus(
+  localId?: string,
+  remoteId?: string,
+): Promise<MergedDispensasiItem | null> {
+  // Cek server jika online dan punya remoteId atau localId
+  if (isSupabaseConfigured && supabase && navigator.onLine) {
+    try {
+      let query = supabase.from('dispensasi').select('*');
+      if (remoteId) {
+        query = query.eq('id', remoteId);
+      } else if (localId) {
+        query = query.eq('local_id', localId);
+      }
+
+      const { data, error } = await query.single();
+      if (!error && data) {
+        return {
+          id: data.id,
+          localId: data.local_id || undefined,
+          remoteId: data.id,
+          namaPengaju: data.nama_pengaju,
+          jobBagian: data.job_bagian,
+          jenisDispensasi: data.jenis_dispensasi,
+          subJenisShift: data.sub_jenis_shift || undefined,
+          keteranganIzinLainnya: data.keterangan_izin_lainnya || undefined,
+          tanggalMulai: data.tanggal_mulai,
+          tanggalSelesai: data.tanggal_selesai,
+          alasan: data.alasan,
+          lampiranUrl: data.lampiran_url || undefined,
+          status: data.status as DispensasiStatus,
+          alasanPenolakan: data.alasan_penolakan || undefined,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at || data.created_at,
+          source: 'server',
+        };
+      }
+    } catch {
+      // Fallback ke penyimpanan lokal jika jaringan gagal
+    }
+  }
+
+  // Fallback: baca dari IndexedDB
+  if (localId) {
+    try {
+      const draft = await getDispensasiDraft(localId);
+      if (draft) {
+        return {
+          id: draft.localId,
+          localId: draft.localId,
+          remoteId: draft.remoteId,
+          namaPengaju: draft.data.namaPengaju,
+          jobBagian: draft.data.jobBagian,
+          jenisDispensasi: draft.data.jenisDispensasi,
+          subJenisShift: draft.data.subJenisShift,
+          keteranganIzinLainnya: draft.data.keteranganIzinLainnya,
+          tanggalMulai: draft.data.tanggalMulai,
+          tanggalSelesai: draft.data.tanggalSelesai,
+          alasan: draft.data.alasan,
+          lampiranUrl: draft.data.lampiranUrl || undefined,
+          status: draft.data.status,
+          alasanPenolakan: draft.data.alasanPenolakan,
+          createdAt: draft.createdAt,
+          updatedAt: draft.lastSyncAttempt || draft.createdAt,
+          source: 'local',
+        };
+      }
+    } catch {
+      // Gagal membaca IndexedDB
+    }
+  }
+
+  return null;
 }

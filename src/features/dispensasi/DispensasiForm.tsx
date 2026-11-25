@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { Input, Select, Textarea, Button, Card, SyncStatusIndicator } from '../../components';
 import {
   DISPENSASI_TYPES,
@@ -16,11 +16,13 @@ import {
 } from './validation';
 import { saveDispensasiDraft, type SyncStatus } from '../../lib/offline-storage';
 import { syncSingleDraft } from '../../lib/dispensasi-sync';
+import { compressImage, formatBytes } from '../../lib/image-compressor';
+import { uploadLampiranToSupabase } from '../../lib/storage-upload';
 
 type SubmitState = 'idle' | 'saving' | 'saved' | 'error';
 
 interface DispensasiFormProps {
-  onSubmitted?: () => void;
+  onSubmitted?: (info: { localId: string; remoteId?: string }) => void;
 }
 
 export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
@@ -29,6 +31,12 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [draftSyncStatus, setDraftSyncStatus] = useState<SyncStatus | null>(null);
   const [submitError, setSubmitError] = useState('');
+
+  // State Lampiran & Kompresi Otomatis
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [compressionInfo, setCompressionInfo] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   // Helper untuk update field
   function updateField<K extends keyof DispensasiFormData>(
@@ -57,6 +65,72 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
     }
   }
 
+  // Handler Pemilihan File, Validasi Ketat 3 Format (JPG, PNG, PDF), & Kompresi Otomatis
+  async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    setFileError(null);
+
+    if (!file) {
+      setSelectedFile(null);
+      setCompressionInfo(null);
+      return;
+    }
+
+    // 1. Ekstensi & MIME Type yang Resmi Diizinkan: JPG, JPEG, PNG, PDF
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+
+    const isValidExtension = extension && allowedExtensions.includes(extension);
+    const isValidMime = allowedMimeTypes.includes(file.type) || (file.type === '' && isValidExtension);
+
+    if (!isValidExtension || !isValidMime) {
+      setSelectedFile(null);
+      setCompressionInfo(null);
+      setFileError(
+        `⚠️ Format "${extension ? '.' + extension : file.name}" ditolak. Lampiran hanya menerima foto (JPG, JPEG, PNG) atau dokumen PDF.`,
+      );
+      e.target.value = '';
+      return;
+    }
+
+    // 2. Batas Ukuran Khusus PDF (Maksimal 5 MB)
+    if (extension === 'pdf' || file.type === 'application/pdf') {
+      const maxPdfBytes = 5 * 1024 * 1024;
+      if (file.size > maxPdfBytes) {
+        setSelectedFile(null);
+        setCompressionInfo(null);
+        setFileError(
+          `⚠️ Dokumen PDF terlalu besar (${formatBytes(file.size)}). Batas maksimal dokumen PDF adalah 5 MB.`,
+        );
+        e.target.value = '';
+        return;
+      }
+
+      setSelectedFile(file);
+      setCompressionInfo(`✓ Dokumen PDF siap: ${file.name} (${formatBytes(file.size)})`);
+      return;
+    }
+
+    // 3. Foto (JPG, PNG): Kompres Otomatis di Browser
+    setIsCompressing(true);
+    try {
+      const result = await compressImage(file);
+      setSelectedFile(result.file);
+      if (result.reductionPercentage > 0) {
+        setCompressionInfo(
+          `✓ Foto dikompres otomatis dari ${formatBytes(result.originalSize)} menjadi ${formatBytes(result.compressedSize)} (Hemat ${result.reductionPercentage}%)`,
+        );
+      } else {
+        setCompressionInfo(`✓ Ukuran optimal: ${formatBytes(result.compressedSize)}`);
+      }
+    } catch {
+      setSelectedFile(file);
+    } finally {
+      setIsCompressing(false);
+    }
+  }
+
   // Opsi-opsi untuk Select
   const jobOptions = TEMPORARY_JOB_LIST.map((j) => ({ value: j, label: j }));
   const jenisOptions = DISPENSASI_TYPES.map((d) => ({
@@ -80,7 +154,6 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
     setErrors(validationErrors);
 
     if (!isFormValid(validationErrors)) {
-      // Scroll ke error pertama
       const firstErrorKey = Object.keys(validationErrors)[0];
       const el =
         document.getElementById(`input-${firstErrorKey}`) ||
@@ -94,7 +167,16 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
     setSubmitError('');
 
     try {
-      // 1. Simpan ke IndexedDB sebagai draft offline lokal terlebih dahulu (aman dari koneksi mati)
+      // 0. Upload file lampiran jika ada (otomatis diunggah jika online)
+      let lampiranUrl: string | undefined = undefined;
+      if (selectedFile) {
+        const uploadedUrl = await uploadLampiranToSupabase(selectedFile);
+        if (uploadedUrl) {
+          lampiranUrl = uploadedUrl;
+        }
+      }
+
+      // 1. Simpan ke IndexedDB sebagai draft offline lokal (aman walau koneksi terputus)
       const draft = await saveDispensasiDraft({
         namaPengaju: formData.namaPengaju.trim(),
         jobBagian: formData.jobBagian,
@@ -108,7 +190,8 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
         tanggalMulai: formData.tanggalMulai,
         tanggalSelesai: formData.tanggalSelesai,
         alasan: formData.alasan.trim(),
-        status: DISPENSASI_STATUS.MENUNGGU_KAPUS,
+        lampiranUrl,
+        status: DISPENSASI_STATUS.MENUNGGU_PERSETUJUAN,
         createdAt: new Date().toISOString(),
       });
 
@@ -124,8 +207,10 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
 
       // Reset form setelah berhasil
       setFormData(INITIAL_FORM_DATA);
+      setSelectedFile(null);
+      setCompressionInfo(null);
       setErrors({});
-      onSubmitted?.();
+      onSubmitted?.({ localId: draft.localId, remoteId: draft.remoteId });
     } catch (err) {
       setSubmitState('error');
       setSubmitError(
@@ -246,8 +331,8 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
         />
       )}
 
-      {/* 4. Tanggal Mulai & Selesai */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* 4. Tanggal Mulai dan Tanggal Selesai */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input
           label="Tanggal Mulai"
           type="date"
@@ -279,19 +364,43 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
         id="textarea-alasan"
       />
 
-      {/* 6. Lampiran (opsional, placeholder - upload belum aktif) */}
-      <Input
-        label="Lampiran"
-        type="file"
-        accept="image/*,.pdf"
-        hint="Opsional. Maks 2 MB. Foto atau PDF."
-        disabled
-        id="input-lampiran"
-      />
-      <p className="!mt-1 text-xs text-slate-400 italic">
-        Upload lampiran belum tersedia — fitur ini akan diaktifkan setelah
-        koneksi Supabase siap.
-      </p>
+      {/* 6. Lampiran (Aktif dengan Kompresi Otomatis) */}
+      <div className="space-y-1.5">
+        <Input
+          label="Bukti / Lampiran (Opsional)"
+          type="file"
+          accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+          onChange={handleFileChange}
+          id="input-lampiran"
+          disabled={isCompressing || submitState === 'saving'}
+        />
+
+        {/* Pesan Error Validasi File */}
+        {fileError && (
+          <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5 font-medium">
+            {fileError}
+          </p>
+        )}
+
+        {/* Status Kompresi Sedang Berjalan */}
+        {isCompressing && (
+          <p className="text-xs text-amber-600 flex items-center gap-1.5 font-medium animate-pulse">
+            <span>⚙️</span>
+            <span>Mengompres foto otomatis untuk menghemat kuota data...</span>
+          </p>
+        )}
+
+        {/* Info Sukses Kompresi / Dokumen */}
+        {compressionInfo && !isCompressing && !fileError && (
+          <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 font-medium">
+            {compressionInfo}
+          </p>
+        )}
+
+        <p className="text-[11px] text-slate-400 italic">
+          Hanya menerima file <strong>JPG, PNG</strong> (foto otomatis dikompres) atau <strong>PDF</strong> (maks. 5 MB).
+        </p>
+      </div>
 
       {/* Tombol Submit */}
       <div className="pt-2">
@@ -300,9 +409,9 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
           variant="primary"
           size="lg"
           loading={submitState === 'saving'}
-          className="w-full"
+          className="w-full bg-[#0F766E] hover:bg-[#0b5852]"
         >
-          {submitState === 'saving' ? 'Menyimpan…' : 'Ajukan Dispensasi'}
+          {submitState === 'saving' ? 'Menyimpan Pengajuan…' : 'Kirim Pengajuan Dispensasi'}
         </Button>
       </div>
     </form>

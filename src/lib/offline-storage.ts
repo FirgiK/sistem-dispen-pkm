@@ -1,22 +1,11 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { DispensasiSubmission } from '../types/dispensasi';
-import type { BencanaReport } from '../types/bencana';
 
 export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed';
 
 export interface DispensasiDraft {
   localId: string;
   data: Omit<DispensasiSubmission, 'id' | 'localId' | 'isOfflineDraft'>;
-  syncStatus: SyncStatus;
-  createdAt: string;
-  lastSyncAttempt?: string;
-  syncError?: string;
-  remoteId?: string;
-}
-
-export interface BencanaDraft {
-  localId: string;
-  data: Omit<BencanaReport, 'id' | 'localId' | 'syncStatus'>;
   syncStatus: SyncStatus;
   createdAt: string;
   lastSyncAttempt?: string;
@@ -33,18 +22,10 @@ interface DashboardDB extends DBSchema {
       'by-created-at': string;
     };
   };
-  bencanaDrafts: {
-    key: string;
-    value: BencanaDraft;
-    indexes: {
-      'by-sync-status': SyncStatus;
-      'by-created-at': string;
-    };
-  };
 }
 
 const DB_NAME = 'dashboard-puskesmas-cipatujah';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance: IDBPDatabase<DashboardDB> | null = null;
 
@@ -60,21 +41,13 @@ async function getDB(): Promise<IDBPDatabase<DashboardDB>> {
         dispensasiStore.createIndex('by-sync-status', 'syncStatus');
         dispensasiStore.createIndex('by-created-at', 'createdAt');
       }
-
-      if (!db.objectStoreNames.contains('bencanaDrafts')) {
-        const bencanaStore = db.createObjectStore('bencanaDrafts', {
-          keyPath: 'localId',
-        });
-        bencanaStore.createIndex('by-sync-status', 'syncStatus');
-        bencanaStore.createIndex('by-created-at', 'createdAt');
-      }
     },
   });
 
   return dbInstance;
 }
 
-export function generateLocalId(prefix: 'disp' | 'bencana' = 'disp'): string {
+export function generateLocalId(prefix: 'disp' = 'disp'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
@@ -129,48 +102,45 @@ export async function updateDispensasiDraftSync(
   await db.put('dispensasiDrafts', updated);
 }
 
-// ─── Bencana Operations ─────────────────────────────────────
-
-export async function saveBencanaDraft(
-  data: BencanaDraft['data'],
-): Promise<BencanaDraft> {
+/**
+ * Menghapus satu draft dispensasi dari IndexedDB browser.
+ */
+export async function deleteDispensasiDraft(localId: string): Promise<void> {
   const db = await getDB();
-  const draft: BencanaDraft = {
-    localId: generateLocalId('bencana'),
-    data,
-    syncStatus: 'pending',
-    createdAt: new Date().toISOString(),
-  };
-  await db.put('bencanaDrafts', draft);
-  return draft;
+  await db.delete('dispensasiDrafts', localId);
 }
 
-export async function getAllBencanaDrafts(): Promise<BencanaDraft[]> {
+/**
+ * Menghapus seluruh draft lokal yang sudah tersinkronisasi ('synced') ke Supabase.
+ * Mencegah penumpukan data di browser pengguna agar HP tetap ringan dan bebas lag.
+ */
+export async function clearSyncedDispensasiDrafts(): Promise<number> {
   const db = await getDB();
-  return db.getAllFromIndex('bencanaDrafts', 'by-created-at');
+  const all = await db.getAll('dispensasiDrafts');
+  let deletedCount = 0;
+  for (const draft of all) {
+    if (draft.syncStatus === 'synced') {
+      await db.delete('dispensasiDrafts', draft.localId);
+      deletedCount++;
+    }
+  }
+  return deletedCount;
 }
 
-export async function getPendingBencanaDrafts(): Promise<BencanaDraft[]> {
-  const db = await getDB();
-  const pending = await db.getAllFromIndex('bencanaDrafts', 'by-sync-status', 'pending');
-  const failed = await db.getAllFromIndex('bencanaDrafts', 'by-sync-status', 'failed');
-  return [...pending, ...failed];
+/**
+ * Pembersihan total wilayah pengguna (IndexedDB + pointer localStorage).
+ */
+export async function purgeLocalUserData(): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.clear('dispensasiDrafts');
+  } catch (err) {
+    console.warn('Gagal membersihkan IndexedDB:', err);
+  }
+  try {
+    localStorage.removeItem('cipatujah_last_dispensasi');
+  } catch (err) {
+    console.warn('Gagal membersihkan localStorage:', err);
+  }
 }
 
-export async function updateBencanaDraftSync(
-  localId: string,
-  update: { syncStatus: SyncStatus; remoteId?: string; syncError?: string },
-): Promise<void> {
-  const db = await getDB();
-  const draft = await db.get('bencanaDrafts', localId);
-  if (!draft) return;
-
-  const updated: BencanaDraft = {
-    ...draft,
-    syncStatus: update.syncStatus,
-    lastSyncAttempt: new Date().toISOString(),
-    ...(update.remoteId !== undefined && { remoteId: update.remoteId }),
-    ...(update.syncError !== undefined && { syncError: update.syncError }),
-  };
-  await db.put('bencanaDrafts', updated);
-}

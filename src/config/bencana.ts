@@ -1,16 +1,33 @@
-import type { BencanaType, StatusKorban } from '../types/bencana';
+/**
+ * Konfigurasi modul Pantauan Bencana & Integrasi SIGAP
+ */
 
-export const BENCANA_TYPES: readonly { type: BencanaType; label: string; requiresCustomNote?: boolean }[] = [
-  { type: 'Banjir', label: 'Banjir' },
-  { type: 'Tanah Longsor', label: 'Tanah Longsor' },
-  { type: 'Gempa Bumi', label: 'Gempa Bumi' },
-  { type: 'Kebakaran', label: 'Kebakaran' },
-  { type: 'Pohon Tumbang', label: 'Pohon Tumbang' },
-  { type: 'Lainnya', label: 'Lainnya (Wajib isi keterangan)', requiresCustomNote: true },
-] as const;
+export const SIGAP_PORTAL_URL = 'https://sigap-pkmcipatujah.netlify.app/';
 
-export const STATUS_KORBAN_OPTIONS: readonly { value: StatusKorban; label: string }[] = [
-  { value: 'belum_diketahui', label: 'Belum Diketahui' },
-  { value: 'tidak_ada', label: 'Tidak Ada Korban' },
-  { value: 'ada', label: 'Ada Korban (Perlu Evakuasi / Medis)' },
-] as const;
+export const SIGAP_STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  'Belum Diverifikasi': {
+    bg: 'bg-amber-50',
+    text: 'text-amber-800',
+    border: 'border-amber-300',
+  },
+  'Terverifikasi': {
+    bg: 'bg-blue-50',
+    text: 'text-blue-800',
+    border: 'border-blue-300',
+  },
+  'Sedang Ditangani': {
+    bg: 'bg-purple-50',
+    text: 'text-purple-800',
+    border: 'border-purple-300',
+  },
+  'Selesai': {
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-800',
+    border: 'border-emerald-300',
+  },
+  'Ditolak': {
+    bg: 'bg-rose-50',
+    text: 'text-rose-800',
+    border: 'border-rose-300',
+  },
+};
