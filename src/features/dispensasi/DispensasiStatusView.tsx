@@ -1,4 +1,11 @@
 import { useState } from 'react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ExternalLink,
+  FileText,
+  RefreshCw,
+} from 'lucide-react';
 import { StatusBadge, Button, Dialog } from '../../components';
 import { DISPENSASI_STATUS } from '../../types/dispensasi';
 import type { MergedDispensasiItem } from '../../lib/dispensasi-sync';
@@ -14,8 +21,7 @@ interface DispensasiStatusViewProps {
 function formatDate(dateStr: string): string {
   if (!dateStr) return '-';
   try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('id-ID', {
+    return new Date(dateStr).toLocaleDateString('id-ID', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -28,15 +34,16 @@ function formatDate(dateStr: string): string {
 function formatDateTime(dateStr: string): string {
   if (!dateStr) return '-';
   try {
-    const d = new Date(dateStr);
-    return d.toLocaleString('id-ID', {
-      timeZone: 'Asia/Jakarta',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }) + ' WIB';
+    return (
+      new Date(dateStr).toLocaleString('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }) + ' WIB'
+    );
   } catch {
     return dateStr;
   }
@@ -67,30 +74,32 @@ export default function DispensasiStatusView({
 
   return (
     <div className="space-y-4">
-      {/* Banner Status Terkini */}
-      <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                 Status Pengajuan Anda
               </span>
-              <span className="text-xs text-slate-300">•</span>
+              <span className="text-slate-300">|</span>
               <button
                 type="button"
                 onClick={onRefresh}
                 disabled={isRefreshing}
-                className="text-xs text-teal-700 hover:text-teal-800 font-semibold flex items-center gap-1 cursor-pointer"
+                className="inline-flex items-center gap-1 text-xs text-slate-700 hover:text-slate-900 font-medium cursor-pointer disabled:opacity-50"
                 title="Cek status terbaru dari server"
               >
-                <span>{isRefreshing ? '⏳' : '🔄'}</span>
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
+                  strokeWidth={1.75}
+                />
                 <span>{isRefreshing ? 'Memperbarui...' : 'Perbarui Status'}</span>
               </button>
             </div>
-            <h2 className="text-xl font-black text-slate-900 mt-1">
+            <h2 className="text-lg font-semibold text-slate-900 mt-1">
               {submission.namaPengaju}
             </h2>
-            <p className="text-xs text-slate-500 font-medium">
+            <p className="text-xs text-slate-500">
               Bagian / Job: {submission.jobBagian}
             </p>
           </div>
@@ -101,85 +110,82 @@ export default function DispensasiStatusView({
         </div>
 
         {/* Detail Pengajuan */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-4 text-xs">
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-            <span className="text-slate-400 block font-medium">Jenis Dispensasi:</span>
-            <span className="font-bold text-slate-800 text-sm mt-0.5 block">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 text-xs">
+          <div className="p-3 rounded-md bg-slate-50 border border-slate-200">
+            <span className="text-slate-500 block font-medium">Jenis Dispensasi</span>
+            <span className="font-semibold text-slate-900 text-sm mt-0.5 block">
               {submission.jenisDispensasi}
               {submission.subJenisShift && (
-                <span className="text-blue-600 font-normal ml-1">
+                <span className="text-slate-600 font-normal ml-1">
                   ({submission.subJenisShift})
                 </span>
               )}
               {submission.keteranganIzinLainnya && (
-                <span className="text-slate-600 font-normal ml-1 italic">
+                <span className="text-slate-600 font-normal ml-1">
                   - {submission.keteranganIzinLainnya}
                 </span>
               )}
             </span>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-            <span className="text-slate-400 block font-medium">Periode Dispensasi:</span>
-            <span className="font-bold text-slate-800 text-sm mt-0.5 block">
+          <div className="p-3 rounded-md bg-slate-50 border border-slate-200">
+            <span className="text-slate-500 block font-medium">Periode Dispensasi</span>
+            <span className="font-mono font-semibold text-slate-900 text-sm mt-0.5 block tabular-nums">
               {formatDate(submission.tanggalMulai)} s/d {formatDate(submission.tanggalSelesai)}
             </span>
           </div>
         </div>
 
-        {/* Alasan */}
-        <div className="mt-3.5 p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-          <span className="text-slate-400 block font-medium mb-0.5">Alasan:</span>
-          <p className="text-slate-700 whitespace-pre-wrap">{submission.alasan}</p>
+        <div className="mt-3 p-3 rounded-md bg-slate-50 border border-slate-200 text-xs">
+          <span className="text-slate-500 block font-medium mb-0.5">Alasan</span>
+          <p className="text-slate-800 whitespace-pre-wrap leading-relaxed">{submission.alasan}</p>
         </div>
 
-        {/* Slot Bukti / Lampiran */}
-        <div className="mt-3.5 p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-          <span className="text-slate-400 block font-medium mb-1">Bukti / Lampiran:</span>
+        <div className="mt-3 p-3 rounded-md bg-slate-50 border border-slate-200 text-xs">
+          <span className="text-slate-500 block font-medium mb-1">Bukti / Lampiran</span>
           {submission.lampiranUrl ? (
             <a
               href={submission.lampiranUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-teal-700 hover:text-teal-900 font-bold hover:underline"
+              className="inline-flex items-center gap-1.5 text-slate-800 hover:text-slate-950 font-medium underline"
               title="Buka lampiran bukti di tab baru"
             >
               <span>Lihat Berkas Lampiran</span>
+              <ExternalLink className="h-3 w-3" strokeWidth={1.75} />
             </a>
           ) : (
-            <span className="text-slate-400 italic text-[11px]">
-              Tidak ada lampiran bukti
-            </span>
+            <span className="text-slate-400 text-[11px]">Tidak ada lampiran bukti</span>
           )}
         </div>
 
-        {/* Catatan Alasan Penolakan Jika Ditolak */}
         {submission.status === DISPENSASI_STATUS.DITOLAK && submission.alasanPenolakan && (
-          <div className="mt-3.5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800">
-            <span className="font-bold block mb-1">Catatan Penolakan dari Pimpinan:</span>
+          <div className="mt-3 p-3.5 rounded-md bg-red-50 border border-red-200 text-xs text-red-800">
+            <span className="font-semibold block mb-1">Catatan Penolakan dari Pimpinan</span>
             <p className="whitespace-pre-wrap">{submission.alasanPenolakan}</p>
           </div>
         )}
 
-        {/* Catatan Status Diberikan di Sadasbor */}
         {submission.status === DISPENSASI_STATUS.SUDAH_DIBERIKAN && (
-          <div className="mt-3.5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
-            <span className="font-bold block mb-0.5">✅ Dispensasi Telah Disetujui</span>
-            <p>
-              Kepala Puskesmas telah memberikan dispensasi presensi Anda secara terpisah di aplikasi Sadasbor.
-            </p>
+          <div className="mt-3 p-3.5 rounded-md bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" strokeWidth={1.75} />
+            <div>
+              <span className="font-semibold block mb-0.5">Dispensasi Telah Disetujui</span>
+              <p>
+                Kepala Puskesmas telah memberikan dispensasi presensi Anda secara terpisah di aplikasi Sadasbor.
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Footer Card: Waktu Submit */}
-        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Diajukan pada: {formatDateTime(submission.createdAt)}</span>
-          <span className="truncate max-w-[140px]">ID: {submission.id}</span>
+        <div className="mt-4 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 font-mono tabular-nums">
+          <span>Diajukan: {formatDateTime(submission.createdAt)}</span>
+          <span className="truncate max-w-[160px]">ID: {submission.id}</span>
         </div>
       </div>
 
       {/* Tombol Aksi Bawah */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
         <div>
           {isPending && (
             <Button
@@ -187,7 +193,7 @@ export default function DispensasiStatusView({
               variant="secondary"
               size="sm"
               onClick={() => setIsCancelDialogOpen(true)}
-              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 w-full sm:w-auto"
+              className="text-red-700 hover:bg-red-50 border-red-300 w-full sm:w-auto"
             >
               Batalkan Pengajuan Saya
             </Button>
@@ -199,13 +205,13 @@ export default function DispensasiStatusView({
           variant="primary"
           size="sm"
           onClick={() => setIsNewFormDialogOpen(true)}
-          className="bg-[#0F766E] hover:bg-[#0b5852] w-full sm:w-auto"
+          className="bg-slate-900 hover:bg-slate-800 w-full sm:w-auto"
         >
           Buat Pengajuan Baru
         </Button>
       </div>
 
-      {/* ─── DIALOG KONFIRMASI PEMBATALAN ─── */}
+      {/* Dialog Konfirmasi Pembatalan */}
       <Dialog
         isOpen={isCancelDialogOpen}
         onClose={() => setIsCancelDialogOpen(false)}
@@ -216,15 +222,15 @@ export default function DispensasiStatusView({
         onConfirm={handleConfirmCancel}
         isConfirmLoading={isCancelling}
         cancelText="Jangan Batalkan"
-        icon={<span className="text-rose-600">⚠️</span>}
+        icon={<AlertTriangle className="h-5 w-5 text-red-600" strokeWidth={1.75} />}
       />
 
-      {/* ─── DIALOG KONFIRMASI BUAT FORM BARU ─── */}
+      {/* Dialog Konfirmasi Buat Form Baru */}
       <Dialog
         isOpen={isNewFormDialogOpen}
         onClose={() => setIsNewFormDialogOpen(false)}
         title="Buat Pengajuan Dispensasi Baru?"
-        description="Formulir isian kosong baru akan dibuka dan memori pelacakan lokal di perangkat Anda akan dibersihkan agar browser tetap ringan. Anda dapat membuat pengajuan tanggal atau tugas lain."
+        description="Formulir isian kosong baru akan dibuka dan memori pelacakan lokal di perangkat Anda akan dibersihkan agar browser tetap ringan."
         confirmText="Ya, Buka Formulir Baru"
         confirmVariant="primary"
         onConfirm={() => {
@@ -232,7 +238,7 @@ export default function DispensasiStatusView({
           onNewForm();
         }}
         cancelText="Tetap di Status Ini"
-        icon={<span className="text-teal-700">📋</span>}
+        icon={<FileText className="h-5 w-5 text-slate-700" strokeWidth={1.75} />}
       />
     </div>
   );

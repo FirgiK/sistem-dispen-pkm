@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 import { Input, Select, Textarea, Button, Card, SyncStatusIndicator } from '../../components';
 import {
   DISPENSASI_TYPES,
@@ -88,7 +89,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
       setSelectedFile(null);
       setCompressionInfo(null);
       setFileError(
-        `⚠️ Format "${extension ? '.' + extension : file.name}" ditolak. Lampiran hanya menerima foto (JPG, JPEG, PNG) atau dokumen PDF.`,
+        `Format "${extension ? '.' + extension : file.name}" ditolak. Lampiran hanya menerima foto (JPG, JPEG, PNG) atau dokumen PDF.`,
       );
       e.target.value = '';
       return;
@@ -101,14 +102,14 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
         setSelectedFile(null);
         setCompressionInfo(null);
         setFileError(
-          `⚠️ Dokumen PDF terlalu besar (${formatBytes(file.size)}). Batas maksimal dokumen PDF adalah 5 MB.`,
+          `Dokumen PDF terlalu besar (${formatBytes(file.size)}). Batas maksimal dokumen PDF adalah 5 MB.`,
         );
         e.target.value = '';
         return;
       }
 
       setSelectedFile(file);
-      setCompressionInfo(`✓ Dokumen PDF siap: ${file.name} (${formatBytes(file.size)})`);
+      setCompressionInfo(`Dokumen PDF siap: ${file.name} (${formatBytes(file.size)})`);
       return;
     }
 
@@ -119,10 +120,10 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
       setSelectedFile(result.file);
       if (result.reductionPercentage > 0) {
         setCompressionInfo(
-          `✓ Foto dikompres otomatis dari ${formatBytes(result.originalSize)} menjadi ${formatBytes(result.compressedSize)} (Hemat ${result.reductionPercentage}%)`,
+          `Foto dikompres otomatis dari ${formatBytes(result.originalSize)} menjadi ${formatBytes(result.compressedSize)} (Hemat ${result.reductionPercentage}%)`,
         );
       } else {
-        setCompressionInfo(`✓ Ukuran optimal: ${formatBytes(result.compressedSize)}`);
+        setCompressionInfo(`Ukuran optimal: ${formatBytes(result.compressedSize)}`);
       }
     } catch {
       setSelectedFile(file);
@@ -226,11 +227,13 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
     return (
       <Card className="text-center">
         <div className="py-6">
-          <span className="text-5xl" aria-hidden="true">✅</span>
-          <h2 className="mt-4 text-lg font-semibold text-slate-800">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700">
+            <CheckCircle2 className="h-6 w-6" strokeWidth={1.75} />
+          </div>
+          <h2 className="mt-4 text-base font-semibold text-slate-900">
             Pengajuan Berhasil Disimpan
           </h2>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-1.5 text-xs sm:text-sm text-slate-600">
             Pengajuan dispensasi Anda telah tercatat dalam sistem.
           </p>
           <div className="mt-3 flex justify-center">
@@ -239,6 +242,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
           <div className="mt-6">
             <Button
               variant="primary"
+              className="bg-slate-900 hover:bg-slate-800"
               onClick={() => {
                 setSubmitState('idle');
                 setDraftSyncStatus(null);
@@ -384,20 +388,20 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
 
         {/* Status Kompresi Sedang Berjalan */}
         {isCompressing && (
-          <p className="text-xs text-amber-600 flex items-center gap-1.5 font-medium animate-pulse">
-            <span>⚙️</span>
+          <p className="text-xs text-amber-700 flex items-center gap-1.5 font-medium">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
             <span>Mengompres foto otomatis untuk menghemat kuota data...</span>
           </p>
         )}
 
         {/* Info Sukses Kompresi / Dokumen */}
         {compressionInfo && !isCompressing && !fileError && (
-          <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 font-medium">
+          <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md p-2 font-medium">
             {compressionInfo}
           </p>
         )}
 
-        <p className="text-[11px] text-slate-400 italic">
+        <p className="text-[11px] text-slate-500">
           Hanya menerima file <strong>JPG, PNG</strong> (foto otomatis dikompres) atau <strong>PDF</strong> (maks. 5 MB).
         </p>
       </div>
@@ -409,7 +413,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
           variant="primary"
           size="lg"
           loading={submitState === 'saving'}
-          className="w-full bg-[#0F766E] hover:bg-[#0b5852]"
+          className="w-full bg-slate-900 hover:bg-slate-800"
         >
           {submitState === 'saving' ? 'Menyimpan Pengajuan…' : 'Kirim Pengajuan Dispensasi'}
         </Button>

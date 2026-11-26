@@ -19,10 +19,10 @@ export default defineConfig({
             if (id.includes('@supabase')) {
               return 'vendor-supabase';
             }
+            if (id.includes('leaflet') || id.includes('react-leaflet')) {
+              return 'vendor-leaflet';
+            }
             return 'vendor-other';
-          }
-          if (id.includes('src/data/dummy-')) {
-            return 'dummy-data';
           }
         },
       },

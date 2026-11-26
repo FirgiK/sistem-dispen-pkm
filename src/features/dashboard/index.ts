@@ -1,2 +1,3 @@
 export { default as DashboardPage } from './DashboardPage';
-export { default as SummaryCards } from './SummaryCards';
+export { default as TopicSummarySection } from './TopicSummarySection';
+export { default as TrendSection } from './TrendSection';

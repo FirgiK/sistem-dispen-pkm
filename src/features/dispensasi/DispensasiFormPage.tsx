@@ -139,7 +139,7 @@ export default function DispensasiFormPage() {
       title={
         <PuskesmasLogo
           size="md"
-          textColor="light"
+          textColor="dark"
           showText={true}
           title="UPTD PUSKESMAS CIPATUJAH"
           subtitle="Dinas Kesehatan Kabupaten Tasikmalaya"
@@ -148,17 +148,16 @@ export default function DispensasiFormPage() {
       headerRight={
         <Link
           to="/layanan"
-          className="rounded-lg bg-white/20 border border-white/25 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/30 transition-colors flex items-center backdrop-blur-xs"
+          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
           title="Buka Pusat Layanan Mandiri Petugas"
         >
-          <span>Layanan Mandiri Petugas</span>
+          Layanan Mandiri Petugas
         </Link>
       }
     >
       {/* ─── KONDISI 1: MEMUAT STATUS DARI MEMORI HP ─── */}
       {isLoadingStatus && (
-        <div className="py-16 text-center text-sm text-slate-500 bg-white rounded-2xl border border-slate-200">
-          <span className="inline-block animate-spin mr-2">⏳</span>
+        <div className="py-14 text-center text-xs text-slate-500 bg-white rounded-lg border border-slate-200">
           Memeriksa riwayat pengajuan di perangkat Anda...
         </div>
       )}
@@ -176,20 +175,20 @@ export default function DispensasiFormPage() {
 
       {/* ─── KONDISI 3: TAMPILKAN FORM ISIAN KOSONG ─── */}
       {!isLoadingStatus && (!activeSubmission || showFormAnyway) && (
-        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
-          {/* Garis Aksen Halus di Pucuk Kartu */}
-          <div className="h-1.5 w-full bg-gradient-to-r from-teal-700 via-emerald-600 to-green-600" />
-
-          <div className="p-6 sm:p-8">
-            {/* Header Internal Formulir */}
-            <div className="pb-5 border-b border-slate-100 flex items-start justify-between gap-3">
+        <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+          <div className="p-5 sm:p-7">
+            {/* Header Internal Formulir (Opsi A: Identitas Instansi di Pucuk Kartu) */}
+            <div className="pb-5 border-b border-slate-200 flex items-start justify-between gap-3">
               <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                <p className="font-mono text-[11px] uppercase tracking-wider text-slate-500">
+                  Formulir Internal Pegawai
+                </p>
+                <h1 className="mt-1 text-lg sm:text-xl font-semibold text-slate-900 tracking-tight">
                   Formulir Pengajuan Dispensasi
                 </h1>
-                <p className="mt-1 text-xs sm:text-sm text-slate-500 leading-relaxed">
-                  Silakan lengkapi data permohonan dispensasi dinas atau shift kerja Anda.
-                  Kolom dengan tanda bintang (<span className="text-red-500 font-bold">*</span>) wajib diisi.
+                <p className="mt-1 text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Lengkapi data permohonan dispensasi dinas atau shift kerja Anda.
+                  Kolom bertanda (<span className="text-red-600 font-semibold">*</span>) wajib diisi.
                 </p>
               </div>
 
@@ -197,15 +196,15 @@ export default function DispensasiFormPage() {
                 <button
                   type="button"
                   onClick={() => setShowFormAnyway(false)}
-                  className="shrink-0 text-xs text-teal-700 hover:text-teal-800 font-bold underline cursor-pointer"
+                  className="shrink-0 text-xs text-slate-700 hover:text-slate-900 font-medium underline cursor-pointer"
                 >
-                  Lihat Status Pengajuan Sebelumnya
+                  Lihat Status Sebelumnya
                 </button>
               )}
             </div>
 
             {/* Kolom Isian Form */}
-            <div className="pt-6">
+            <div className="pt-5">
               <DispensasiForm onSubmitted={handleFormSubmitted} />
             </div>
           </div>

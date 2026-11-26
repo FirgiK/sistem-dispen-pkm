@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 
 // Dynamic Import (Code Splitting): hanya unduh halaman saat dibuka pengguna
 const DispensasiFormPage = lazy(() =>
@@ -17,9 +18,9 @@ const ComingSoonPage = lazy(() =>
 
 function PageLoadingFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 text-sm">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 text-sm">
       <div className="flex items-center gap-2">
-        <span className="inline-block animate-spin">⏳</span>
+        <Loader2 className="h-4 w-4 animate-spin text-slate-500" strokeWidth={1.75} />
         <span className="font-medium">Memuat halaman...</span>
       </div>
     </div>
