@@ -36,16 +36,14 @@ export const DISPENSASI_TYPES: readonly {
  * Disediakan sebagai referensi sementara yang mudah diubah dari satu tempat.
  */
 export const TEMPORARY_JOB_LIST: readonly string[] = [
-  'Poli Umum',
-  'Poli Gigi',
-  'Poli KIA / KB',
-  'IGD / Tindakan',
-  'Rawat Inap',
-  'Farmasi / Obat',
-  'Laboratorium',
-  'Pendaftaran / Rekam Medis',
-  'Tata Usaha / Administrasi',
-  'Promosi Kesehatan & Kesling',
+  'Dokter',
+  'Dokter Gigi',
+  'Perawat',
+  'Bidan',
+  'Kesmas',
+  'Kesling',
+  'ATLM',
   'Gizi',
-  'Pustu / Poskesdes',
+  'Kefarmasian',
+  'Non-Kesehatan',
 ] as const;

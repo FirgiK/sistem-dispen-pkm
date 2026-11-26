@@ -30,7 +30,6 @@ import type {
   MapLayerId,
   TitikLapangan,
 } from "../../types/peta";
-import { generateSimulatedMapData } from "./map-simulation";
 import { useTitikLapangan } from "./useTitikLapangan";
 
 interface CipatujahMapViewProps {
@@ -85,16 +84,6 @@ export default function CipatujahMapView({
   const [selectedVillage, setSelectedVillage] =
     useState<CipatujahVillage | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(CIPATUJAH_DEFAULT_ZOOM);
-  const [isSimulationMode, setIsSimulationMode] = useState<boolean>(false);
-
-  const simulatedData = useMemo(
-    () => (import.meta.env.DEV && isSimulationMode ? generateSimulatedMapData() : null),
-    [isSimulationMode],
-  );
-
-  const effectiveSigapReports = simulatedData ? simulatedData.bencana : sigapReports;
-  const effectiveSigapConfigured = simulatedData ? true : isSigapConfigured;
-  const effectiveFieldPoints = simulatedData ? simulatedData.fieldPoints : fieldPoints;
 
   function toggleLayer(layerId: MapLayerId) {
     setActiveLayers((prev) => {
@@ -111,7 +100,7 @@ export default function CipatujahMapView({
   // Hitung jumlah titik per lapisan
   const layerCounts = useMemo(() => {
     const counts: Record<MapLayerId, number> = {
-      bencana: effectiveSigapConfigured ? effectiveSigapReports.length : 0,
+      bencana: isSigapConfigured ? sigapReports.length : 0,
       penyakit_menular: 0,
       posyandu_kia: 0,
       imunisasi: 0,
@@ -122,38 +111,38 @@ export default function CipatujahMapView({
       fasilitas_jaringan: 0,
     };
 
-    for (const pt of effectiveFieldPoints) {
+    for (const pt of fieldPoints) {
       if (pt.lapisan in counts) {
         counts[pt.lapisan] += 1;
       }
     }
     return counts;
-  }, [effectiveFieldPoints, effectiveSigapConfigured, effectiveSigapReports.length]);
+  }, [fieldPoints, isSigapConfigured, sigapReports.length]);
 
   // Klaster titik bencana dengan Haversine 1 km
   const disasterClusters = useMemo(() => {
-    if (!activeLayers.has("bencana") || !effectiveSigapConfigured) return [];
-    return clusterDisasterPoints(effectiveSigapReports, zoomLevel, 1000);
-  }, [activeLayers, effectiveSigapConfigured, effectiveSigapReports, zoomLevel]);
+    if (!activeLayers.has("bencana") || !isSigapConfigured) return [];
+    return clusterDisasterPoints(sigapReports, zoomLevel, 1000);
+  }, [activeLayers, isSigapConfigured, sigapReports, zoomLevel]);
 
   // Klaster 8 lapisan titik lapangan dengan Haversine 1 km
   const visibleFieldClusters = useMemo(() => {
-    const filtered = effectiveFieldPoints.filter(
+    const filtered = fieldPoints.filter(
       (pt) => pt.lapisan !== "bencana" && activeLayers.has(pt.lapisan),
     );
     return clusterFieldPoints(filtered, zoomLevel, 1000);
-  }, [effectiveFieldPoints, activeLayers, zoomLevel]);
+  }, [fieldPoints, activeLayers, zoomLevel]);
 
   // Rincian titik untuk desa yang sedang dipilih
   const selectedVillageDetails = useMemo(() => {
     if (!selectedVillage) return { disasters: [], fieldItems: [] };
     const needle = selectedVillage.name.toLowerCase();
 
-    const disasters = effectiveSigapConfigured
-      ? effectiveSigapReports.filter((r) => r.lokasi.toLowerCase().includes(needle))
+    const disasters = isSigapConfigured
+      ? sigapReports.filter((r) => r.lokasi.toLowerCase().includes(needle))
       : [];
 
-    const fieldItems = effectiveFieldPoints.filter(
+    const fieldItems = fieldPoints.filter(
       (pt) =>
         pt.desa.toLowerCase().includes(needle) && activeLayers.has(pt.lapisan),
     );
@@ -161,9 +150,9 @@ export default function CipatujahMapView({
     return { disasters, fieldItems };
   }, [
     selectedVillage,
-    effectiveSigapConfigured,
-    effectiveSigapReports,
-    effectiveFieldPoints,
+    isSigapConfigured,
+    sigapReports,
+    fieldPoints,
     activeLayers,
   ]);
 
@@ -194,36 +183,18 @@ export default function CipatujahMapView({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-            {import.meta.env.DEV && (
-              <button
-                type="button"
-                onClick={() => setIsSimulationMode((prev) => !prev)}
-                className={`cursor-pointer inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                  isSimulationMode
-                    ? "border-amber-600 bg-amber-600 text-white hover:bg-amber-700"
-                    : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
-                }`}
-              >
-                <span>
-                  {isSimulationMode ? "Matikan Simulasi" : "Mode Simulasi (50/lapisan)"}
-                </span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={refreshFieldPoints}
-              disabled={isLoadingFieldPoints || !isSupabaseConfigured}
-              className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${isLoadingFieldPoints ? "animate-spin" : ""}`}
-                strokeWidth={1.75}
-              />
-              <span>Muat Ulang Lapisan</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={refreshFieldPoints}
+            disabled={isLoadingFieldPoints || !isSupabaseConfigured}
+            className="cursor-pointer inline-flex items-center gap-1.5 self-start sm:self-auto rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${isLoadingFieldPoints ? "animate-spin" : ""}`}
+              strokeWidth={1.75}
+            />
+            <span>Muat Ulang Lapisan</span>
+          </button>
         </div>
 
         {/* Toggle Filter 9 Lapisan */}
@@ -271,16 +242,7 @@ export default function CipatujahMapView({
 
         {/* Peringatan Kejujuran Data */}
         <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-          {isSimulationMode && (
-            <span className="inline-flex items-center gap-1 rounded border border-amber-400 bg-amber-50 px-2 py-1 font-medium text-amber-900">
-              <AlertCircle
-                className="h-3.5 w-3.5 shrink-0"
-                strokeWidth={1.75}
-              />
-              MODE SIMULASI AKTIF: Menampilkan 50 titik uji per lapisan (bukan data asli).
-            </span>
-          )}
-          {!effectiveSigapConfigured && activeLayers.has("bencana") && (
+          {!isSigapConfigured && activeLayers.has("bencana") && (
             <span className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-amber-900">
               <AlertCircle
                 className="h-3.5 w-3.5 shrink-0"

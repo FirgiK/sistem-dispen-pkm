@@ -144,16 +144,22 @@ export default function DispensasiStatusView({
         <div className="mt-3 p-3 rounded-md bg-slate-50 border border-slate-200 text-xs">
           <span className="text-slate-500 block font-medium mb-1">Bukti / Lampiran</span>
           {submission.lampiranUrl ? (
-            <a
-              href={submission.lampiranUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-slate-800 hover:text-slate-950 font-medium underline"
-              title="Buka lampiran bukti di tab baru"
-            >
-              <span>Lihat Berkas Lampiran</span>
-              <ExternalLink className="h-3 w-3" strokeWidth={1.75} />
-            </a>
+            submission.lampiranUrl.startsWith('http') ? (
+              <a
+                href={submission.lampiranUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-slate-800 hover:text-slate-950 font-medium underline"
+                title="Buka lampiran bukti di tab baru"
+              >
+                <span>Lihat Berkas Lampiran</span>
+                <ExternalLink className="h-3 w-3" strokeWidth={1.75} />
+              </a>
+            ) : (
+              <span className="text-slate-700 font-medium">
+                Lampiran bukti terunggah (privat, dapat dilihat Pimpinan)
+              </span>
+            )
           ) : (
             <span className="text-slate-400 text-[11px]">Tidak ada lampiran bukti</span>
           )}

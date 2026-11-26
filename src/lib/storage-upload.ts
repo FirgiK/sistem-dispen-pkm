@@ -1,8 +1,10 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 
+const BUCKET_NAME = 'lampiran-dispensasi';
+
 /**
- * Upload file lampiran (foto/surat tugas) ke Supabase Storage.
- * Otomatis mengembalikan Public URL file.
+ * Upload file lampiran (foto/surat tugas) ke Supabase Storage (bucket private).
+ * Mengembalikan storage path (contoh: pengajuan/12345-abc.jpg).
  */
 export async function uploadLampiranToSupabase(file: File): Promise<string | null> {
   if (!isSupabaseConfigured || !supabase || !navigator.onLine) {
@@ -15,24 +17,46 @@ export async function uploadLampiranToSupabase(file: File): Promise<string | nul
     const filePath = `pengajuan/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('lampiran-dispensasi')
+      .from(BUCKET_NAME)
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
       });
 
     if (uploadError) {
-      console.warn('Supabase Storage notice:', uploadError.message);
       return null;
     }
 
-    const { data } = supabase.storage
-      .from('lampiran-dispensasi')
-      .getPublicUrl(filePath);
+    return filePath;
+  } catch {
+    return null;
+  }
+}
 
-    return data.publicUrl || null;
-  } catch (err) {
-    console.warn('Kesalahan saat upload lampiran:', err);
+/**
+ * Membuat Signed URL sementara (5 menit) untuk membaca lampiran di bucket private.
+ * Hanya berhasil untuk pengguna dashboard yang sudah login dengan izin dispensasi:read.
+ */
+export async function getLampiranSignedUrl(pathOrUrl: string): Promise<string | null> {
+  if (!pathOrUrl) return null;
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+    return pathOrUrl;
+  }
+  if (!isSupabaseConfigured || !supabase || !navigator.onLine) {
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .createSignedUrl(pathOrUrl, 300);
+
+    if (error || !data?.signedUrl) {
+      return null;
+    }
+
+    return data.signedUrl;
+  } catch {
     return null;
   }
 }

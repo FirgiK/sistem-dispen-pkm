@@ -45,26 +45,19 @@ export async function syncSingleDraft(draft: DispensasiDraft): Promise<boolean> 
   await updateDispensasiDraftSync(draft.localId, { syncStatus: 'syncing' });
 
   try {
-    const payload = {
-      local_id: draft.localId,
-      nama_pengaju: draft.data.namaPengaju,
-      job_bagian: draft.data.jobBagian,
-      jenis_dispensasi: draft.data.jenisDispensasi,
-      sub_jenis_shift: draft.data.subJenisShift || null,
-      keterangan_izin_lainnya: draft.data.keteranganIzinLainnya || null,
-      tanggal_mulai: draft.data.tanggalMulai,
-      tanggal_selesai: draft.data.tanggalSelesai,
-      alasan: draft.data.alasan,
-      status: draft.data.status,
-      created_at: draft.createdAt,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await supabase
-      .from('dispensasi')
-      .upsert(payload, { onConflict: 'local_id' })
-      .select('id')
-      .single();
+    const { data: remoteId, error } = await supabase.rpc('submit_dispensasi_draft', {
+      p_local_id: draft.localId,
+      p_nama_pengaju: draft.data.namaPengaju,
+      p_job_bagian: draft.data.jobBagian,
+      p_jenis_dispensasi: draft.data.jenisDispensasi,
+      p_sub_jenis_shift: draft.data.subJenisShift || null,
+      p_keterangan_izin_lainnya: draft.data.keteranganIzinLainnya || null,
+      p_tanggal_mulai: draft.data.tanggalMulai,
+      p_tanggal_selesai: draft.data.tanggalSelesai,
+      p_alasan: draft.data.alasan,
+      p_lampiran_url: draft.data.lampiranUrl || null,
+      p_created_at: draft.createdAt,
+    });
 
     if (error) {
       throw error;
@@ -72,7 +65,7 @@ export async function syncSingleDraft(draft: DispensasiDraft): Promise<boolean> 
 
     await updateDispensasiDraftSync(draft.localId, {
       syncStatus: 'synced',
-      remoteId: data.id,
+      remoteId: typeof remoteId === 'string' ? remoteId : undefined,
     });
 
     return true;
@@ -236,28 +229,44 @@ export async function updateDispensasiDecision(
   }
 }
 
+/**
+ * Menghapus pengajuan dispensasi (khusus Kapus dari panel detail).
+ */
+export async function deleteDispensasi(item: MergedDispensasiItem): Promise<void> {
+  if (isSupabaseConfigured && supabase && item.remoteId && navigator.onLine) {
+    const { error } = await supabase
+      .from('dispensasi')
+      .delete()
+      .eq('id', item.remoteId);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (item.localId) {
+    await deleteDispensasiDraft(item.localId);
+  }
+}
+
 
 /**
  * Membatalkan pengajuan dispensasi oleh pengaju sendiri (Alur v3: Status 'Dibatalkan').
  */
 export async function cancelDispensasi(
   localId?: string,
-  remoteId?: string,
+  _remoteId?: string,
 ): Promise<boolean> {
   const newStatus = DISPENSASI_STATUS.DIBATALKAN;
 
-  // 1. Update ke Supabase jika remoteId ada dan online
-  if (isSupabaseConfigured && supabase && remoteId && navigator.onLine) {
+  // 1. Update ke Supabase via RPC terbatas jika localId ada dan online
+  if (isSupabaseConfigured && supabase && localId && navigator.onLine) {
     try {
-      await supabase
-        .from('dispensasi')
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', remoteId);
-    } catch (err) {
-      console.warn('Gagal membatalkan di Supabase:', err);
+      await supabase.rpc('cancel_my_dispensasi', {
+        p_local_id: localId,
+      });
+    } catch {
+      // Tetap lanjut update di IndexedDB lokal
     }
   }
 
@@ -284,19 +293,16 @@ export async function cancelDispensasi(
  */
 export async function fetchSubmissionStatus(
   localId?: string,
-  remoteId?: string,
+  _remoteId?: string,
 ): Promise<MergedDispensasiItem | null> {
-  // Cek server jika online dan punya remoteId atau localId
-  if (isSupabaseConfigured && supabase && navigator.onLine) {
+  // Cek server via RPC terbatas jika online dan punya localId
+  if (isSupabaseConfigured && supabase && localId && navigator.onLine) {
     try {
-      let query = supabase.from('dispensasi').select('*');
-      if (remoteId) {
-        query = query.eq('id', remoteId);
-      } else if (localId) {
-        query = query.eq('local_id', localId);
-      }
+      const { data: rows, error } = await supabase.rpc('get_my_dispensasi_status', {
+        p_local_id: localId,
+      });
 
-      const { data, error } = await query.single();
+      const data = Array.isArray(rows) ? rows[0] : null;
       if (!error && data) {
         return {
           id: data.id,

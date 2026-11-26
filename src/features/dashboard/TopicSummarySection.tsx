@@ -81,6 +81,7 @@ interface TopicSummarySectionProps {
   pendingCount: number;
   givenCount30Days: number;
   pendingDraftsCount: number;
+  isLoading?: boolean;
   isSupabaseConfigured: boolean;
   isSigapConfigured: boolean;
   activeBencanaCount: number;
@@ -92,6 +93,7 @@ export default function TopicSummarySection({
   pendingCount,
   givenCount30Days,
   pendingDraftsCount,
+  isLoading = false,
   isSupabaseConfigured,
   isSigapConfigured,
   activeBencanaCount,
@@ -102,7 +104,7 @@ export default function TopicSummarySection({
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <TopicCard
         title="Antrean Dispensasi Menunggu"
-        value={pendingCount}
+        value={isLoading ? '...' : pendingCount}
         unit="pengajuan menunggu keputusan"
         dateLabel={todayLabel}
         source={isSupabaseConfigured ? 'Supabase: dispensasi' : 'IndexedDB Lokal'}
@@ -118,7 +120,7 @@ export default function TopicSummarySection({
 
       <TopicCard
         title="Dispensasi Disetujui (30 Hari)"
-        value={givenCount30Days}
+        value={isLoading ? '...' : givenCount30Days}
         unit="sudah diberikan di Sadasbor"
         dateLabel="30 hari terakhir"
         source={isSupabaseConfigured ? 'Supabase: dispensasi' : 'IndexedDB Lokal'}

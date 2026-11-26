@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   fetchMergedDispensasiList,
   updateDispensasiDecision,
+  deleteDispensasi,
   syncPendingDrafts,
   type MergedDispensasiItem,
 } from '../../lib/dispensasi-sync';
@@ -70,6 +71,14 @@ export function useDispensasiList() {
     [fetchList],
   );
 
+  const removeDispensasi = useCallback(
+    async (item: MergedDispensasiItem) => {
+      await deleteDispensasi(item);
+      await fetchList();
+    },
+    [fetchList],
+  );
+
   // Monitor status online / offline
   useEffect(() => {
     function handleOnline() {
@@ -105,5 +114,6 @@ export function useDispensasiList() {
     refresh: fetchList,
     triggerSync,
     giveDecision,
+    removeDispensasi,
   };
 }

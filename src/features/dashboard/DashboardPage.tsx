@@ -12,12 +12,14 @@ import {
   FileText,
   LayoutDashboard,
   Loader2,
+  LogOut,
   Map as MapIcon,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   RefreshCw,
+  Trash2,
   X,
 } from 'lucide-react';
 import {
@@ -33,9 +35,11 @@ import {
 import { DISPENSASI_TYPES } from '../../config/dispensasi';
 import { SIGAP_PORTAL_URL } from '../../config/bencana';
 import type { MergedDispensasiItem } from '../../lib/dispensasi-sync';
+import { getLampiranSignedUrl } from '../../lib/storage-upload';
 import { DISPENSASI_STATUS } from '../../types/dispensasi';
 import { BencanaCardList, useSigapBencanaList } from '../bencana';
 import { RejectModal, useDispensasiList } from '../dispensasi';
+import { LoginPage, useAuthSession } from '../auth';
 import TopicSummarySection from './TopicSummarySection';
 import TrendSection from './TrendSection';
 
@@ -85,6 +89,23 @@ function toLocalDateKey(date: Date): string {
 }
 
 export default function DashboardPage() {
+  const {
+    isSupabaseConfigured: isAuthEnabled,
+    user,
+    profile,
+    roles,
+    permissions,
+    hasPermission,
+    isLoading: isAuthLoading,
+    authError,
+    signIn,
+    signOut,
+  } = useAuthSession();
+
+  const canReadDispensasi = !isAuthEnabled || hasPermission('dispensasi:read');
+  const canDecideDispensasi = !isAuthEnabled || hasPermission('dispensasi:decide');
+  const canReadPeta = !isAuthEnabled || hasPermission('peta:read');
+
   const [mainTab, setMainTab] = useState<MainTab>('grafik');
   const [activeNav, setActiveNav] = useState<SideMenuSection>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -103,6 +124,7 @@ export default function DashboardPage() {
     refresh,
     triggerSync,
     giveDecision,
+    removeDispensasi,
   } = useDispensasiList();
 
   const {
@@ -116,6 +138,8 @@ export default function DashboardPage() {
   const [rejectingItem, setRejectingItem] = useState<MergedDispensasiItem | null>(null);
   const [approvingItem, setApprovingItem] = useState<MergedDispensasiItem | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  const [deletingItem, setDeletingItem] = useState<MergedDispensasiItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -235,29 +259,44 @@ export default function DashboardPage() {
     await giveDecision(rejectingItem, DISPENSASI_STATUS.DITOLAK, reason);
   }
 
+  async function handleConfirmDelete() {
+    if (!deletingItem) return;
+    setIsDeleting(true);
+    try {
+      await removeDispensasi(deletingItem);
+      setDeletingItem(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const todayFormatted = new Date().toLocaleDateString('id-ID', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
 
-  const navItems: {
+  const allNavItems: {
     id: SideMenuSection;
     label: string;
     icon: typeof LayoutDashboard;
     badge?: number;
+    visible: boolean;
   }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
     {
       id: 'dispensasi',
       label: 'Dispensasi',
       icon: ClipboardCheck,
       badge: allPendingItems.length > 0 ? allPendingItems.length : undefined,
+      visible: canReadDispensasi,
     },
-    { id: 'bencana', label: 'Bencana', icon: AlertTriangle },
-    { id: 'tren', label: 'Tren', icon: BarChart3 },
-    { id: 'peta', label: 'Peta', icon: MapIcon },
+    { id: 'bencana', label: 'Bencana', icon: AlertTriangle, visible: true },
+    { id: 'tren', label: 'Tren', icon: BarChart3, visible: true },
+    { id: 'peta', label: 'Peta', icon: MapIcon, visible: canReadPeta },
   ];
+
+  const navItems = allNavItems.filter((item) => item.visible);
 
   const statusChips = [
     { value: 'all', label: 'Semua', count: items.length },
@@ -300,15 +339,19 @@ export default function DashboardPage() {
         <div className="rounded border border-slate-200 bg-white p-2.5">
           <span className="text-slate-500 block mb-1">Bukti / Lampiran</span>
           {item.lampiranUrl ? (
-            <a
-              href={item.lampiranUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded border border-slate-300 bg-slate-50 px-2.5 py-1 font-medium text-slate-800 hover:bg-slate-100"
+            <button
+              type="button"
+              onClick={async () => {
+                const url = await getLampiranSignedUrl(item.lampiranUrl!);
+                if (url) {
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                }
+              }}
+              className="cursor-pointer inline-flex items-center gap-1.5 rounded border border-slate-300 bg-slate-50 px-2.5 py-1 font-medium text-slate-800 hover:bg-slate-100"
             >
               <span>Lihat Berkas Lampiran</span>
               <ExternalLink className="h-3 w-3" strokeWidth={1.75} />
-            </a>
+            </button>
           ) : (
             <span className="text-slate-400">Tidak ada lampiran bukti</span>
           )}
@@ -323,9 +366,50 @@ export default function DashboardPage() {
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-1 font-mono tabular-nums">
           <span>Diajukan: {formatDateTime(item.createdAt)}</span>
-          <span className="truncate max-w-[200px]">ID: {item.id}</span>
+          <div className="flex items-center gap-3">
+            <span className="truncate max-w-[200px]">ID: {item.id}</span>
+            {canDecideDispensasi && (
+              <button
+                type="button"
+                onClick={() => setDeletingItem(item)}
+                className="cursor-pointer inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 font-sans text-[11px] font-medium text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="h-3 w-3" strokeWidth={1.75} />
+                <span>Hapus Pengajuan</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
+    );
+  }
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 text-sm">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin text-slate-500" strokeWidth={1.75} />
+          <span className="font-medium">Memeriksa sesi login...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthEnabled && !user) {
+    return <LoginPage onSignIn={signIn} authError={authError} />;
+  }
+
+  if (isAuthEnabled && user && (!profile?.isActive || permissions.size === 0)) {
+    return (
+      <LoginPage
+        onSignIn={signIn}
+        authError={authError}
+        authenticatedWithoutAccess={{
+          email: profile?.email || user.email || '-',
+          isInactive: profile ? !profile.isActive : false,
+          onSignOut: signOut,
+        }}
+      />
     );
   }
 
@@ -394,6 +478,17 @@ export default function DashboardPage() {
               <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
               <span>Form Dispensasi</span>
             </Link>
+            {isAuthEnabled && user && (
+              <button
+                type="button"
+                onClick={signOut}
+                title={`Keluar (${roles.join(', ')})`}
+                className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+                <span className="hidden sm:inline">Keluar</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -509,23 +604,25 @@ export default function DashboardPage() {
                 <span>Grafik</span>
               </button>
 
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mainTab === 'peta'}
-                onClick={() => {
-                  setMainTab('peta');
-                  setActiveNav('peta');
-                }}
-                className={`cursor-pointer inline-flex items-center gap-1.5 rounded px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                  mainTab === 'peta'
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <MapIcon className="h-3.5 w-3.5" strokeWidth={1.75} />
-                <span>Peta</span>
-              </button>
+              {canReadPeta && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mainTab === 'peta'}
+                  onClick={() => {
+                    setMainTab('peta');
+                    setActiveNav('peta');
+                  }}
+                  className={`cursor-pointer inline-flex items-center gap-1.5 rounded px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                    mainTab === 'peta'
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <MapIcon className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  <span>Peta</span>
+                </button>
+              )}
             </div>
 
             {pendingDraftsCount > 0 && (
@@ -539,7 +636,7 @@ export default function DashboardPage() {
           {mainTab === 'grafik' && (
             <div className="space-y-6">
               {/* HERO SECTION: PERLU KEPUTUSAN HARI INI (URGENT: HARI INI & BESOK, BISA DI-EXPAND) */}
-              {activeNav === 'dashboard' && (
+              {activeNav === 'dashboard' && canReadDispensasi && (
                 <section className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
                     <div>
@@ -554,11 +651,16 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <span className="font-mono text-xs font-semibold rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-amber-800 self-start sm:self-center tabular-nums">
-                      {urgentPendingQueue.length} MENDESAK
+                      {isLoading ? 'MEMUAT...' : `${urgentPendingQueue.length} MENDESAK`}
                     </span>
                   </div>
 
-                  {urgentPendingQueue.length === 0 ? (
+                  {isLoading ? (
+                    <div className="space-y-2" aria-label="Memuat antrean mendesak">
+                      <div className="h-16 rounded-md border border-slate-200 bg-slate-100 animate-pulse" />
+                      <div className="h-16 rounded-md border border-slate-200 bg-slate-100 animate-pulse" />
+                    </div>
+                  ) : urgentPendingQueue.length === 0 ? (
                     <div className="rounded border border-dashed border-slate-200 bg-slate-50 py-6 px-4 text-center text-xs text-slate-500">
                       Tidak ada pengajuan mendesak untuk hari ini maupun besok.
                     </div>
@@ -607,27 +709,29 @@ export default function DashboardPage() {
                                 </div>
                               </div>
 
-                              <div
-                                className="flex items-center gap-2 shrink-0"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => setRejectingItem(item)}
-                                  className="border-red-300 text-red-700 hover:bg-red-50"
+                              {canDecideDispensasi && (
+                                <div
+                                  className="flex items-center gap-2 shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  Tolak
-                                </Button>
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  onClick={() => setApprovingItem(item)}
-                                  className="bg-emerald-700 hover:bg-emerald-800 text-white"
-                                >
-                                  Terima
-                                </Button>
-                              </div>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setRejectingItem(item)}
+                                    className="border-red-300 text-red-700 hover:bg-red-50"
+                                  >
+                                    Tolak
+                                  </Button>
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={() => setApprovingItem(item)}
+                                    className="bg-emerald-700 hover:bg-emerald-800 text-white"
+                                  >
+                                    Terima
+                                  </Button>
+                                </div>
+                              )}
                             </div>
 
                             {isExpanded && renderExpandedDetail(item)}
@@ -662,6 +766,7 @@ export default function DashboardPage() {
                   pendingCount={allPendingItems.length}
                   givenCount30Days={givenCount30Days}
                   pendingDraftsCount={pendingDraftsCount}
+                  isLoading={isLoading}
                   isSupabaseConfigured={isConfigured}
                   isSigapConfigured={isSigapConfigured}
                   activeBencanaCount={activeBencanaCount}
@@ -680,7 +785,7 @@ export default function DashboardPage() {
               )}
 
               {/* DAFTAR LENGKAP DISPENSASI (HANYA DI MENU DISPENSASI - OPSI A, DENGAN PAGINASI) */}
-              {activeNav === 'dispensasi' && (
+              {activeNav === 'dispensasi' && canReadDispensasi && (
                 <section className="space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
                     <div className="flex flex-wrap gap-1.5">
@@ -836,7 +941,7 @@ export default function DashboardPage() {
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <StatusBadge status={item.status} />
-                                  {isPending && (
+                                  {isPending && canDecideDispensasi && (
                                     <div className="flex items-center gap-1.5">
                                       <Button
                                         variant="secondary"
@@ -930,6 +1035,19 @@ export default function DashboardPage() {
         isConfirmLoading={isApproving}
         cancelText="Batal"
         icon={<CheckCircle2 className="h-5 w-5 text-emerald-700" strokeWidth={1.75} />}
+      />
+
+      <Dialog
+        isOpen={Boolean(deletingItem)}
+        onClose={() => setDeletingItem(null)}
+        title="Konfirmasi Hapus Pengajuan"
+        description={`Pengajuan atas nama "${deletingItem?.namaPengaju}" akan dihapus permanen dan tidak bisa dikembalikan.`}
+        confirmText="Ya, Hapus Pengajuan"
+        confirmVariant="danger"
+        onConfirm={handleConfirmDelete}
+        isConfirmLoading={isDeleting}
+        cancelText="Batal"
+        icon={<Trash2 className="h-5 w-5 text-red-700" strokeWidth={1.75} />}
       />
     </div>
   );
