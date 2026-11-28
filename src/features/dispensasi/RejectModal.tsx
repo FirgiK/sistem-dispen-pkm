@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Button, Textarea } from '../../components';
+import { useState } from "react";
+import { Button, Textarea } from "../../components";
 
 interface RejectModalProps {
   isOpen: boolean;
@@ -14,8 +14,8 @@ export default function RejectModal({
   onClose,
   onConfirm,
 }: RejectModalProps) {
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState('');
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -23,18 +23,18 @@ export default function RejectModal({
   async function handleConfirm() {
     const trimmed = reason.trim();
     if (!trimmed) {
-      setError('Alasan penolakan WAJIB diisi sesuai aturan alur dispensasi.');
+      setError("Alasan penolakan WAJIB diisi sesuai aturan alur dispensasi.");
       return;
     }
 
     setIsSubmitting(true);
-    setError('');
+    setError("");
     try {
       await onConfirm(trimmed);
-      setReason('');
+      setReason("");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menolak pengajuan');
+      setError(err instanceof Error ? err.message : "Gagal menolak pengajuan");
     } finally {
       setIsSubmitting(false);
     }
@@ -48,7 +48,10 @@ export default function RejectModal({
       aria-labelledby="reject-title"
     >
       <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl border border-slate-200">
-        <h3 id="reject-title" className="text-base font-semibold text-slate-800">
+        <h3
+          id="reject-title"
+          className="text-base font-semibold text-slate-800"
+        >
           Tolak Pengajuan Dispensasi
         </h3>
         <p className="mt-1 text-xs text-slate-600">
@@ -62,14 +65,14 @@ export default function RejectModal({
             value={reason}
             onChange={(e) => {
               setReason(e.target.value);
-              if (error) setError('');
+              if (error) setError("");
             }}
             error={error}
             required
             id="textarea-alasan-penolakan"
           />
           <p className="mt-1 text-[11px] text-amber-600">
-            * Catatan: Alasan penolakan wajib dicatat dan dapat dilihat oleh pengaju.
+            * Catatan: Alasan penolakan akan dilihat oleh pengaju.
           </p>
         </div>
 

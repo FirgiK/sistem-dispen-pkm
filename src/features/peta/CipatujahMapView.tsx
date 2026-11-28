@@ -72,6 +72,7 @@ export default function CipatujahMapView({
 }: CipatujahMapViewProps) {
   const {
     points: fieldPoints,
+    isDummyMode,
     isSupabaseConfigured,
     isLoading: isLoadingFieldPoints,
     error: fieldPointsError,
@@ -240,36 +241,46 @@ export default function CipatujahMapView({
           </div>
         </div>
 
-        {/* Peringatan Kejujuran Data */}
-        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-          {!isSigapConfigured && activeLayers.has("bencana") && (
-            <span className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-amber-900">
+        {/* Peringatan Kejujuran Data & Flag Data Simulasi */}
+        <div className="mt-3 flex flex-col gap-2 text-[11px] text-slate-600">
+          {isDummyMode && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950">
               <AlertCircle
-                className="h-3.5 w-3.5 shrink-0"
+                className="h-4 w-4 text-amber-700 shrink-0 mt-0.5"
                 strokeWidth={1.75}
               />
-              Lapisan Bencana: API SIGAP belum terhubung (0 titik).
-            </span>
+              <div>
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-wider rounded bg-amber-200/80 px-1.5 py-0.5 text-amber-900 mr-1.5">
+                  DATA SIMULASI / DUMMY
+                </span>
+                <span>
+                  {isSupabaseConfigured
+                    ? "Tabel titik_lapangan di Supabase masih kosong, sehingga 8 lapisan kesehatan menampilkan titik contoh sementara."
+                    : "Supabase belum terhubung, sehingga 8 lapisan kesehatan menampilkan titik contoh sementara."}
+                </span>
+              </div>
+            </div>
           )}
-          {!isSupabaseConfigured && (
-            <span className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-slate-700">
-              <AlertCircle
-                className="h-3.5 w-3.5 shrink-0"
-                strokeWidth={1.75}
-              />
-              Supabase belum terhubung: 8 lapisan{" "}
-              <code className="font-mono">titik_lapangan</code> kosong.
-            </span>
-          )}
-          {fieldPointsError && (
-            <span className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2 py-1 text-red-700">
-              <AlertCircle
-                className="h-3.5 w-3.5 shrink-0"
-                strokeWidth={1.75}
-              />
-              {fieldPointsError}
-            </span>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {!isSigapConfigured && activeLayers.has("bencana") && (
+              <span className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-amber-900">
+                <AlertCircle
+                  className="h-3.5 w-3.5 shrink-0"
+                  strokeWidth={1.75}
+                />
+                Lapisan Bencana: API SIGAP belum terhubung (0 titik).
+              </span>
+            )}
+            {fieldPointsError && (
+              <span className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2 py-1 text-red-700">
+                <AlertCircle
+                  className="h-3.5 w-3.5 shrink-0"
+                  strokeWidth={1.75}
+                />
+                {fieldPointsError}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -408,11 +419,18 @@ export default function CipatujahMapView({
                   >
                     <Popup>
                       <div className="text-xs space-y-1 min-w-[180px]">
-                        <p className="font-semibold text-slate-900">
-                          {cluster.count > 1
-                            ? `Klaster (${cluster.count} titik)`
-                            : cluster.points[0]?.nama_titik}
-                        </p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-semibold text-slate-900">
+                            {cluster.count > 1
+                              ? `Klaster (${cluster.count} titik)`
+                              : cluster.points[0]?.nama_titik}
+                          </p>
+                          {isDummyMode && (
+                            <span className="font-mono text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                              SIMULASI
+                            </span>
+                          )}
+                        </div>
                         {cluster.points.slice(0, 3).map((pt: TitikLapangan) => (
                           <div
                             key={pt.id}

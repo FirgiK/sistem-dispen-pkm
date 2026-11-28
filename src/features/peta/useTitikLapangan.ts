@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { DUMMY_TITIK_LAPANGAN } from '../../config/peta-dummy';
 import type { TitikLapangan } from '../../types/peta';
 
 export function useTitikLapangan() {
   const [points, setPoints] = useState<TitikLapangan[]>([]);
+  const [isDummyMode, setIsDummyMode] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchPoints = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) {
-      setPoints([]);
+      setPoints(DUMMY_TITIK_LAPANGAN);
+      setIsDummyMode(true);
       setIsLoading(false);
       setError(null);
       return;
@@ -28,9 +31,17 @@ export function useTitikLapangan() {
         throw new Error(queryError.message);
       }
 
-      setPoints((data as TitikLapangan[]) || []);
+      const rows = (data as TitikLapangan[]) || [];
+      if (rows.length === 0) {
+        setPoints(DUMMY_TITIK_LAPANGAN);
+        setIsDummyMode(true);
+      } else {
+        setPoints(rows);
+        setIsDummyMode(false);
+      }
     } catch (err) {
-      setPoints([]);
+      setPoints(DUMMY_TITIK_LAPANGAN);
+      setIsDummyMode(true);
       setError(
         err instanceof Error
           ? err.message
@@ -47,6 +58,7 @@ export function useTitikLapangan() {
 
   return {
     points,
+    isDummyMode,
     isSupabaseConfigured,
     isLoading,
     error,

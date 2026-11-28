@@ -1,37 +1,50 @@
-import { useState, type FormEvent, type ChangeEvent } from 'react';
-import { CheckCircle2, Loader2 } from 'lucide-react';
-import { Input, Select, Textarea, Button, Card, SyncStatusIndicator } from '../../components';
+import { useState, type FormEvent, type ChangeEvent } from "react";
+import { CheckCircle2, Loader2 } from "lucide-react";
+import {
+  Input,
+  Select,
+  Textarea,
+  Button,
+  Card,
+  SyncStatusIndicator,
+} from "../../components";
 import {
   DISPENSASI_TYPES,
   SHIFT_SUBTYPES,
   TEMPORARY_JOB_LIST,
-} from '../../config/dispensasi';
-import { DISPENSASI_STATUS } from '../../types/dispensasi';
-import type { DispensasiType, ShiftSubtype } from '../../types/dispensasi';
+} from "../../config/dispensasi";
+import { DISPENSASI_STATUS } from "../../types/dispensasi";
+import type { DispensasiType, ShiftSubtype } from "../../types/dispensasi";
 import {
   validateDispensasiForm,
   isFormValid,
   INITIAL_FORM_DATA,
   type DispensasiFormData,
   type DispensasiFormErrors,
-} from './validation';
-import { saveDispensasiDraft, type SyncStatus } from '../../lib/offline-storage';
-import { syncSingleDraft } from '../../lib/dispensasi-sync';
-import { compressImage, formatBytes } from '../../lib/image-compressor';
-import { uploadLampiranToSupabase } from '../../lib/storage-upload';
+} from "./validation";
+import {
+  saveDispensasiDraft,
+  type SyncStatus,
+} from "../../lib/offline-storage";
+import { syncSingleDraft } from "../../lib/dispensasi-sync";
+import { compressImage, formatBytes } from "../../lib/image-compressor";
+import { uploadLampiranToSupabase } from "../../lib/storage-upload";
 
-type SubmitState = 'idle' | 'saving' | 'saved' | 'error';
+type SubmitState = "idle" | "saving" | "saved" | "error";
 
 interface DispensasiFormProps {
   onSubmitted?: (info: { localId: string; remoteId?: string }) => void;
 }
 
 export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
-  const [formData, setFormData] = useState<DispensasiFormData>(INITIAL_FORM_DATA);
+  const [formData, setFormData] =
+    useState<DispensasiFormData>(INITIAL_FORM_DATA);
   const [errors, setErrors] = useState<DispensasiFormErrors>({});
-  const [submitState, setSubmitState] = useState<SubmitState>('idle');
-  const [draftSyncStatus, setDraftSyncStatus] = useState<SyncStatus | null>(null);
-  const [submitError, setSubmitError] = useState('');
+  const [submitState, setSubmitState] = useState<SubmitState>("idle");
+  const [draftSyncStatus, setDraftSyncStatus] = useState<SyncStatus | null>(
+    null,
+  );
+  const [submitError, setSubmitError] = useState("");
 
   // State Lampiran & Kompresi Otomatis
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -48,9 +61,9 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
       const next = { ...prev, [key]: value };
 
       // Reset sub-jenis saat jenis berubah
-      if (key === 'jenisDispensasi') {
-        next.subJenisShift = '';
-        next.keteranganIzinLainnya = '';
+      if (key === "jenisDispensasi") {
+        next.subJenisShift = "";
+        next.keteranganIzinLainnya = "";
       }
 
       return next;
@@ -78,38 +91,42 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
     }
 
     // 1. Ekstensi & MIME Type yang Resmi Diizinkan: JPG, JPEG, PNG, PDF
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
-    const allowedMimeTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const allowedExtensions = ["jpg", "jpeg", "png", "pdf"];
+    const allowedMimeTypes = ["image/jpeg", "image/png", "application/pdf"];
 
     const isValidExtension = extension && allowedExtensions.includes(extension);
-    const isValidMime = allowedMimeTypes.includes(file.type) || (file.type === '' && isValidExtension);
+    const isValidMime =
+      allowedMimeTypes.includes(file.type) ||
+      (file.type === "" && isValidExtension);
 
     if (!isValidExtension || !isValidMime) {
       setSelectedFile(null);
       setCompressionInfo(null);
       setFileError(
-        `Format "${extension ? '.' + extension : file.name}" ditolak. Lampiran hanya menerima foto (JPG, JPEG, PNG) atau dokumen PDF.`,
+        `Format "${extension ? "." + extension : file.name}" ditolak. Lampiran hanya menerima foto (JPG, JPEG, PNG) atau dokumen PDF.`,
       );
-      e.target.value = '';
+      e.target.value = "";
       return;
     }
 
     // 2. Batas Ukuran Khusus PDF (Maksimal 5 MB)
-    if (extension === 'pdf' || file.type === 'application/pdf') {
+    if (extension === "pdf" || file.type === "application/pdf") {
       const maxPdfBytes = 5 * 1024 * 1024;
       if (file.size > maxPdfBytes) {
         setSelectedFile(null);
         setCompressionInfo(null);
         setFileError(
-          `Dokumen PDF terlalu besar (${formatBytes(file.size)}). Batas maksimal dokumen PDF adalah 5 MB.`,
+          `Dokumen PDF terlalu besar (${formatBytes(file.size)}). Batas maksimal dokumen PDF 5 MB.`,
         );
-        e.target.value = '';
+        e.target.value = "";
         return;
       }
 
       setSelectedFile(file);
-      setCompressionInfo(`Dokumen PDF siap: ${file.name} (${formatBytes(file.size)})`);
+      setCompressionInfo(
+        `Lampiran siap: ${file.name} (${formatBytes(file.size)})`,
+      );
       return;
     }
 
@@ -118,13 +135,9 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
     try {
       const result = await compressImage(file);
       setSelectedFile(result.file);
-      if (result.reductionPercentage > 0) {
-        setCompressionInfo(
-          `Foto dikompres otomatis dari ${formatBytes(result.originalSize)} menjadi ${formatBytes(result.compressedSize)} (Hemat ${result.reductionPercentage}%)`,
-        );
-      } else {
-        setCompressionInfo(`Ukuran optimal: ${formatBytes(result.compressedSize)}`);
-      }
+      setCompressionInfo(
+        `Lampiran siap: ${result.file.name} (${formatBytes(result.compressedSize)})`,
+      );
     } catch {
       setSelectedFile(file);
     } finally {
@@ -160,12 +173,12 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
         document.getElementById(`input-${firstErrorKey}`) ||
         document.getElementById(`select-${firstErrorKey}`) ||
         document.getElementById(`textarea-${firstErrorKey}`);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
-    setSubmitState('saving');
-    setSubmitError('');
+    setSubmitState("saving");
+    setSubmitError("");
 
     try {
       // 0. Upload file lampiran jika ada (otomatis diunggah jika online)
@@ -197,12 +210,12 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
       });
 
       setDraftSyncStatus(draft.syncStatus);
-      setSubmitState('saved');
+      setSubmitState("saved");
 
       // 2. Jika online dan Supabase siap, langsung sinkronkan ke server secara background
       syncSingleDraft(draft).then((synced) => {
         if (synced) {
-          setDraftSyncStatus('synced');
+          setDraftSyncStatus("synced");
         }
       });
 
@@ -213,17 +226,17 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
       setErrors({});
       onSubmitted?.({ localId: draft.localId, remoteId: draft.remoteId });
     } catch (err) {
-      setSubmitState('error');
+      setSubmitState("error");
       setSubmitError(
         err instanceof Error
           ? err.message
-          : 'Gagal menyimpan draft. Coba lagi.',
+          : "Gagal menyimpan draft. Coba lagi.",
       );
     }
   }
 
   // Kalau baru saja berhasil submit, tampilkan konfirmasi
-  if (submitState === 'saved' && draftSyncStatus) {
+  if (submitState === "saved" && draftSyncStatus) {
     return (
       <Card className="text-center">
         <div className="py-6">
@@ -244,7 +257,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
               variant="primary"
               className="bg-slate-900 hover:bg-slate-800"
               onClick={() => {
-                setSubmitState('idle');
+                setSubmitState("idle");
                 setDraftSyncStatus(null);
               }}
             >
@@ -259,7 +272,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
       {/* Error submit global */}
-      {submitState === 'error' && submitError && (
+      {submitState === "error" && submitError && (
         <div
           className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           role="alert"
@@ -273,7 +286,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
         label="Nama Pengaju"
         placeholder="Masukkan nama lengkap"
         value={formData.namaPengaju}
-        onChange={(e) => updateField('namaPengaju', e.target.value)}
+        onChange={(e) => updateField("namaPengaju", e.target.value)}
         error={errors.namaPengaju}
         required
         autoComplete="name"
@@ -285,7 +298,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
         label="Job / Bagian"
         options={jobOptions}
         value={formData.jobBagian}
-        onChange={(e) => updateField('jobBagian', e.target.value)}
+        onChange={(e) => updateField("jobBagian", e.target.value)}
         error={errors.jobBagian}
         required
         hint="Daftar ini masih sementara dan bisa berubah"
@@ -298,7 +311,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
         options={jenisOptions}
         value={formData.jenisDispensasi}
         onChange={(e) =>
-          updateField('jenisDispensasi', e.target.value as DispensasiType | '')
+          updateField("jenisDispensasi", e.target.value as DispensasiType | "")
         }
         error={errors.jenisDispensasi}
         required
@@ -312,7 +325,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
           options={shiftOptions}
           value={formData.subJenisShift}
           onChange={(e) =>
-            updateField('subJenisShift', e.target.value as ShiftSubtype | '')
+            updateField("subJenisShift", e.target.value as ShiftSubtype | "")
           }
           error={errors.subJenisShift}
           required
@@ -326,9 +339,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
           label="Keterangan Izin"
           placeholder="Jelaskan jenis izin yang diajukan"
           value={formData.keteranganIzinLainnya}
-          onChange={(e) =>
-            updateField('keteranganIzinLainnya', e.target.value)
-          }
+          onChange={(e) => updateField("keteranganIzinLainnya", e.target.value)}
           error={errors.keteranganIzinLainnya}
           required
           id="textarea-keteranganIzinLainnya"
@@ -341,7 +352,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
           label="Tanggal Mulai"
           type="date"
           value={formData.tanggalMulai}
-          onChange={(e) => updateField('tanggalMulai', e.target.value)}
+          onChange={(e) => updateField("tanggalMulai", e.target.value)}
           error={errors.tanggalMulai}
           required
           id="input-tanggalMulai"
@@ -350,7 +361,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
           label="Tanggal Selesai"
           type="date"
           value={formData.tanggalSelesai}
-          onChange={(e) => updateField('tanggalSelesai', e.target.value)}
+          onChange={(e) => updateField("tanggalSelesai", e.target.value)}
           error={errors.tanggalSelesai}
           required
           id="input-tanggalSelesai"
@@ -362,7 +373,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
         label="Alasan"
         placeholder="Tuliskan alasan pengajuan dispensasi"
         value={formData.alasan}
-        onChange={(e) => updateField('alasan', e.target.value)}
+        onChange={(e) => updateField("alasan", e.target.value)}
         error={errors.alasan}
         required
         id="textarea-alasan"
@@ -376,7 +387,7 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
           accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
           onChange={handleFileChange}
           id="input-lampiran"
-          disabled={isCompressing || submitState === 'saving'}
+          disabled={isCompressing || submitState === "saving"}
         />
 
         {/* Pesan Error Validasi File */}
@@ -386,11 +397,11 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
           </p>
         )}
 
-        {/* Status Kompresi Sedang Berjalan */}
+        {/* Status Pemrosesan Lampiran */}
         {isCompressing && (
           <p className="text-xs text-amber-700 flex items-center gap-1.5 font-medium">
             <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
-            <span>Mengompres foto otomatis untuk menghemat kuota data...</span>
+            <span>Memproses lampiran...</span>
           </p>
         )}
 
@@ -402,7 +413,8 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
         )}
 
         <p className="text-[11px] text-slate-500">
-          Hanya menerima file <strong>JPG, PNG</strong> (foto otomatis dikompres) atau <strong>PDF</strong> (maks. 5 MB).
+          Upload file <strong>JPG, PNG</strong> atau <strong>PDF</strong> (maks.
+          5 MB).
         </p>
       </div>
 
@@ -412,10 +424,12 @@ export default function DispensasiForm({ onSubmitted }: DispensasiFormProps) {
           type="submit"
           variant="primary"
           size="lg"
-          loading={submitState === 'saving'}
+          loading={submitState === "saving"}
           className="w-full bg-slate-900 hover:bg-slate-800"
         >
-          {submitState === 'saving' ? 'Menyimpan Pengajuan…' : 'Kirim Pengajuan Dispensasi'}
+          {submitState === "saving"
+            ? "Menyimpan Pengajuan…"
+            : "Kirim Pengajuan Dispensasi"}
         </Button>
       </div>
     </form>
