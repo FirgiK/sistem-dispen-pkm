@@ -36,7 +36,7 @@ export default function PuskesmasLogo({
       {showText && (
         <div className="text-left min-w-0">
           <p
-            className={`text-xs sm:text-sm font-black uppercase tracking-wider leading-tight ${
+            className={`truncate text-xs sm:text-sm font-black uppercase tracking-wider leading-tight ${
               isLight ? 'text-white' : 'text-slate-800'
             }`}
           >
@@ -44,7 +44,7 @@ export default function PuskesmasLogo({
           </p>
           {subtitle && (
             <p
-              className={`text-[11px] font-medium leading-tight mt-0.5 ${
+              className={`hidden sm:block truncate text-[11px] font-medium leading-tight mt-0.5 ${
                 isLight ? 'text-teal-100' : 'text-slate-500'
               }`}
             >
